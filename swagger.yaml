@@ -1,0 +1,75 @@
+openapi: 3.0.3
+info:
+  title: Home Energy Usage Uploader API
+  version: 1.0.0
+  description: |
+    Accepts a CSV of daily energy usage (multipart upload), validates rows, stores to DynamoDB,
+    and returns alerts for any usage values exceeding a provided threshold.
+servers:
+  - url: "https://${ApiGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+    description: API Gateway HTTP API stage
+paths:
+  /energy/upload/{threshold}:
+    post:
+      consumes:
+        - multipart/form-data
+      x-amazon-apigateway-binary-media-types:
+        - multipart/form-data
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${putUsageFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+      summary: Upload energy usage CSV and get alerts
+      operationId: uploadEnergyUsage
+      parameters:
+      - in: query
+        name: threshold
+        description: Threshold for usage alerts
+        schema:
+          type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadRequest'
+            encoding:
+              file:
+                contentType: text/csv
+      responses:
+        '200':
+          description: Successfully processed the CSV
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+        '400':
+          description: Invalid request (e.g., missing threshold or invalid CSV)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+        '500':
+          description: Unexpected internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+components:
+  schemas:
+    UploadRequest:
+      type: object
+      required: file
+      properties:
+        file:
+          type: string
+          format: binary
+          description: CSV file containing energy usage data
+    Response:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+security: []

@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  PGE
+Transform:
+- AWS::Serverless-2016-10-31
+
+Resources:
+  # This is an API gateway associated with the putUsageFunction
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Test
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: swagger.yaml
+
+  # This is a Lambda function config associated with the source code: put-usage.js
+  putUsageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: src/handlers/putUsage.putUsageHandler
+      Runtime: nodejs22.x
+      Description: HTTP post method to upload file for processing
+      Environment:
+        Variables:
+          TABLE_NAME: EnergyUsage
+          DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref usageTable
+        - S3CrudPolicy:
+            BucketName: !Ref putUsageS3Bucket
+      LoggingConfig:
+        LogGroup: !Ref putUsageLogGroup
+  
+  putUsageS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: put-usage-bucket
+
+  putUsageLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: put-usage
+
+  usageTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: EnergyUsage
+      PrimaryKey: 
+        Name: id
+        Type: String
+
+Outputs:
+  APIGatewayEndpoint:
+    Description: API Gateway endpoint URL for Test stage
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Test/"

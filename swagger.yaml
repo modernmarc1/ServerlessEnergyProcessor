@@ -11,8 +11,6 @@ servers:
 paths:
   /energy/upload/{threshold}:
     post:
-      consumes:
-        - multipart/form-data
       x-amazon-apigateway-binary-media-types:
         - multipart/form-data
       x-amazon-apigateway-integration:
@@ -22,12 +20,6 @@ paths:
         type: aws_proxy
       summary: Upload energy usage CSV and get alerts
       operationId: uploadEnergyUsage
-      parameters:
-      - in: query
-        name: threshold
-        description: Threshold for usage alerts
-        schema:
-          type: integer
       requestBody:
         required: true
         content:
@@ -60,7 +52,7 @@ components:
   schemas:
     UploadRequest:
       type: object
-      required: file
+      required: [file]
       properties:
         file:
           type: string

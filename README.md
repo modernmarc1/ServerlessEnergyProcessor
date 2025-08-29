@@ -1,4 +1,4 @@
-# PGE Serverless Energy Usage Application
+# Serverless Energy Usage Application
 
 This project is a full-stack serverless application for uploading, processing, and analyzing energy usage data. It leverages AWS Serverless Application Model (SAM) to define and deploy backend resources, and includes a React-based frontend for user interaction. For local testing and development, the project uses [LocalStack](https://github.com/localstack/localstack) to emulate AWS services such as S3 and DynamoDB.
 

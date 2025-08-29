@@ -1,5 +1,5 @@
 {
-    "name": "pge-test",
+    "name": "serverless-energy-processor",
     "version": "0.0.1",
     "dependencies": {
         "@aws-sdk/client-dynamodb": "^3.398.0",

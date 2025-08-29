@@ -55,7 +55,6 @@ async function addToS3Bucket(body, fileName) {
     const nameParts = fileName.split('.');
     const ext = nameParts.pop();
     fileName = `${nameParts.join('.')}_${timestamp}.${ext}`;
-    fileName
     const input = {
       Body: body,
       Bucket: "put-usage-bucket",
@@ -88,85 +87,85 @@ async function batchWriteToDynamoDB(client, batch, errorMessages) {
  * @returns {object} response - returns success or error response
 **/
 export const putUsageHandler = async (event) => {
-    try {
-      // All log statements are written to CloudWatch LogGroupName PutUsage
-      console.info('received:', event);
+  try {
+    // All log statements are written to CloudWatch LogGroupName PutUsage
+    console.info('received:', event);
 
-      // Get CSV content from event body and add to S3 bucket
-      const { csvContent, fileName } = getCSVContent(event);
-      await addToS3Bucket(csvContent, fileName);
+    // Get CSV content from event body and add to S3 bucket
+    const { csvContent, fileName } = getCSVContent(event);
+    await addToS3Bucket(csvContent, fileName);
 
-      // create DynamoDB client & responses
-      const client = new DynamoDBClient(clientCreds);
+    // create DynamoDB client & responses
+    const client = new DynamoDBClient(clientCreds);
 
-      // Create response body arrays
-      const threshold = Number(event.pathParameters.threshold);
-      const thresholdExceeded = [];
-      const errorMessages = [];
+    // Create response body arrays
+    const threshold = Number(event.pathParameters.threshold);
+    const thresholdExceeded = [];
+    const errorMessages = [];
 
-      //create a CSV parser readable stream
-      const parser = parse({
-        columns: true,
-        delimiter: ','
-      });
-      const readableStream = Readable.from([csvContent]);
-      readableStream.pipe(parser);
+    //create a CSV parser readable stream
+    const parser = parse({
+      columns: true,
+      delimiter: ','
+    });
+    const readableStream = Readable.from([csvContent]);
+    readableStream.pipe(parser);
 
-      let batch = [];
-      const batchSize = 25;
+    let batch = [];
+    const batchSize = 25;
 
-      for await (const record of parser) {
-        // Validate if record exceeds threshold
-        if (parseFloat(record.Usage) > threshold) {
-          thresholdExceeded.push({
-            date: record.Date,
-            usage: record.Usage
-          });
-        }
-
-        // Adding records for DynamoDB
-        batch.push({
-          PutRequest: {
-            Item: {
-              date: { S: record.Date },
-              usage: { N: record.Usage },
-              userId: { S: "demo-user" },
-              id: { S: crypto.randomUUID() }
-            }
-          }
+    for await (const record of parser) {
+      // Validate if record exceeds threshold
+      if (parseFloat(record.Usage) > threshold) {
+        thresholdExceeded.push({
+          date: record.Date,
+          usage: record.Usage
         });
-
-        if (batch.length === batchSize) {
-          try {
-            await batchWriteToDynamoDB(client, batch, errorMessages)
-          } catch (error) {
-            console.error(`Batch write error: ${error}`);
-          }
-          batch = [];
-        }
       }
 
-      if (batch.length > 0) {
+      // Adding records for DynamoDB
+      batch.push({
+        PutRequest: {
+          Item: {
+            date: { S: record.Date },
+            usage: { N: record.Usage },
+            userId: { S: "demo-user" },
+            id: { S: crypto.randomUUID() }
+          }
+        }
+      });
+
+      if (batch.length === batchSize) {
         try {
           await batchWriteToDynamoDB(client, batch, errorMessages)
         } catch (error) {
           console.error(`Batch write error: ${error}`);
+        }
+        batch = [];
       }
     }
-      
-      console.log('threshold exceeded:', thresholdExceeded);
-      console.log('error messages:', errorMessages);
 
-      const statusCode = errorMessages.length ? 400 : 200;
-      const body = JSON.stringify({
-        thresholdExceeded,
-        errorMessages,
-        message: errorMessages.length ? "File processed with errors" : "File processed successfully"
-      })
-      
-      console.info(`response from: ${event.path} statusCode: ${statusCode} body: ${body}`);
-      const response = getResponse(statusCode, body);
-      return response;
+    if (batch.length > 0) {
+      try {
+        await batchWriteToDynamoDB(client, batch, errorMessages)
+      } catch (error) {
+        console.error(`Batch write error: ${error}`);
+      }
+    }
+    
+    console.log('threshold exceeded:', thresholdExceeded);
+    console.log('error messages:', errorMessages);
+
+    const statusCode = errorMessages.length ? 400 : 200;
+    const body = JSON.stringify({
+      thresholdExceeded,
+      errorMessages,
+      message: errorMessages.length ? "File processed with errors" : "File processed successfully"
+    })
+    
+    console.info(`response from: ${event.path} statusCode: ${statusCode} body: ${body}`);
+    const response = getResponse(statusCode, body);
+    return response;
   } catch (error) {
     const errorMessage = `Unexpected error processing request: ${error.message}`;
     const body = JSON.stringify({ errorMessages: [errorMessage] });
